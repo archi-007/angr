@@ -1204,7 +1204,6 @@ public:
 					{
 						taint_entity_t sink;
 						std::unordered_set<taint_entity_t> srcs;
-						block_taint_entry_t block_taint_entry;
 
 						sink.entity_type = TAINT_ENTITY_TMP;
 						sink.tmp_id = stmt->Ist.WrTmp.tmp;
@@ -1218,7 +1217,6 @@ public:
 					{
 						taint_entity_t sink;
 						std::unordered_set<taint_entity_t> srcs;
-						block_taint_entry_t block_taint_entry;
 
 						sink.entity_type = TAINT_ENTITY_MEM;
 						auto temp = get_taint_sources(stmt->Ist.Store.addr);
@@ -1233,7 +1231,6 @@ public:
 					{
 						taint_entity_t sink;
 						std::unordered_set<taint_entity_t> srcs;
-						block_taint_entry_t block_taint_entry;
 
 						sink.entity_type = TAINT_ENTITY_NONE;
 						srcs = get_taint_sources(stmt->Ist.Exit.guard);
