@@ -699,7 +699,7 @@ public:
 					"Please don't do that, I put my GDT there!\n");
 			} else {
 				printf("[sim_unicorn] Something very bad is happening; please investigate. "
-					"Trying to activate the page at %#llx but it's already activated.\n", address);
+					"Trying to activate the page at %#lx but it's already activated.\n", address);
 				// to the person who sees this error:
 				// you're gonna need to spend some time looking into it.
 				// I'm not 100% sure that this is necessarily a bug condition.
@@ -771,7 +771,7 @@ public:
 			auto page = page_cache->find(address+offset);
 			if (page != page_cache->end())
 			{
-				fprintf(stderr, "[%#" PRIx64 ", %#" PRIx64 "](%#zx) already in cache.\n", address+offset, address+offset + 0x1000, 0x1000);
+				fprintf(stderr, "[%#" PRIx64 ", %#" PRIx64 "](%#zx) already in cache.\n", address+offset, address+offset + 0x1000, (size_t)0x1000);
 				assert(page->second.size == 0x1000);
 				assert(memcmp(page->second.bytes, bytes + offset, 0x1000) == 0);
 
@@ -1646,9 +1646,7 @@ public:
 		if (entity.entity_type == TAINT_ENTITY_REG) {
 			return is_symbolic_register(entity.reg_offset);
 		}
-		else if (entity.entity_type == TAINT_ENTITY_TMP) {
-			return is_symbolic_temp(entity.tmp_id);
-		}
+		return is_symbolic_temp(entity.tmp_id);
 	}
 
 	void propagate_taints() {
