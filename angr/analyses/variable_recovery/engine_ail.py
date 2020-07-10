@@ -74,7 +74,7 @@ class SimEngineVRAIL(
                 ret_expr: SimRegArg = self.project.factory.cc().RETURN_VAL
             ret_reg_offset = self.project.arch.registers[ret_expr.reg_name][0]
 
-        # discovery the prototype
+        # discover the prototype
         prototype: Optional[SimTypeFunction] = None
         if stmt.calling_convention is not None:
             prototype = stmt.calling_convention.func_ty
@@ -90,6 +90,8 @@ class SimEngineVRAIL(
                 ret_ty = TypeLifter(self.arch.bits).lift(prototype.returnty)
             else:
                 ret_ty = None
+            if isinstance(ret_ty, typeconsts.BottomType):
+                ret_ty = None
 
             self._assign_to_register(
                 ret_reg_offset,
@@ -103,7 +105,7 @@ class SimEngineVRAIL(
             for arg, arg_type in zip(args, prototype.args):
                 arg_ty = TypeLifter(self.arch.bits).lift(arg_type)
                 type_constraint = typevars.Subtype(
-                    arg.typevar, arg_ty
+                    arg_ty, arg.typevar
                 )
                 self.state.add_type_constraint(type_constraint)
 
@@ -191,16 +193,24 @@ class SimEngineVRAIL(
 
         try:
             typevar = None
+            type_constraints = set()
             if r0.typevar is not None and isinstance(r1.data, int):
+                # addition with constants. create a derived type variable
                 typevar = typevars.DerivedTypeVariable(r0.typevar, typevars.AddN(r1.data))
+            else:
+                # create a new type variable and add constraints accordingly
+                typevar = typevars.TypeVariable()
+                type_constraints.add(typevars.Add(r0.typevar, r1.typevar, typevar))
 
             sum_ = None
             if r0.data is not None and r1.data is not None:
                 sum_ = r0.data + r1.data
 
+            type_constraints.add(typevars.Subtype(r0.typevar, r1.typevar))
+
             return RichR(sum_,
                          typevar=typevar,
-                         type_constraints={ typevars.Subtype(r0.typevar, r1.typevar) }
+                         type_constraints=type_constraints,
                          )
         except TypeError:
             return RichR(ailment.Expr.BinaryOp(expr.idx, 'Add', [r0, r1], **expr.tags))

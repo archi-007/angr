@@ -21,17 +21,19 @@ class SimEngineRDAIL(
     SimEngineLightAILMixin,
     SimEngineLight,
 ):  # pylint:disable=abstract-method
-    def __init__(self, project, current_local_call_depth, maximum_local_call_depth, function_handler=None):
+    def __init__(self, project, call_stack, maximum_local_call_depth, function_handler=None):
         super(SimEngineRDAIL, self).__init__()
         self.project = project
-        self._current_local_call_depth = current_local_call_depth
+        self._call_stack = call_stack
         self._maximum_local_call_depth = maximum_local_call_depth
         self._function_handler = function_handler
         self._visited_blocks = None
+        self._dep_graph = None
 
         self.state: ReachingDefinitionsState
 
     def process(self, state, *args, **kwargs):
+        self._dep_graph = kwargs.pop('dep_graph', None)
         self._visited_blocks = kwargs.pop('visited_blocks', None)
 
         # we are using a completely different state. Therefore, we directly call our _process() method before
@@ -45,7 +47,7 @@ class SimEngineRDAIL(
         except SimEngineError as e:
             if kwargs.pop('fail_fast', False) is True:
                 raise e
-        return self.state, self._visited_blocks
+        return self.state, self._visited_blocks, self._dep_graph
 
     #
     # Private methods
@@ -117,7 +119,7 @@ class SimEngineRDAIL(
                 l.info('Memory address undefined, ins_addr = %#x.', self.ins_addr)
                 continue
 
-            if any(type(d) is Undefined for d in data):
+            if isinstance(data, DataSet) and any(type(d) is Undefined for d in data):
                 l.info('Data to write at address %s undefined, ins_addr = %#x.',
                        hex(a) if type(a) is int else a, self.ins_addr
                        )
@@ -328,7 +330,11 @@ class SimEngineRDAIL(
                 if current_defs:
                     for current_def in current_defs:
                         # self.state.add_use(current_def, codeloc)
-                        data.update(current_def.data)
+                        if isinstance(current_def.data, DataSet):
+                            data.update(current_def.data)
+                        else:
+                            # dropped
+                            l.warning("Dropping data of type %s since it is not a DataSet.", type(current_def.data))
                     if any(type(d) is Undefined for d in data):
                         l.info('Stack access at offset %#x undefined, ins_addr = %#x.', addr.offset, self.ins_addr)
                 else:
@@ -390,7 +396,7 @@ class SimEngineRDAIL(
         cond = self._expr(expr.cond)
         iftrue = self._expr(expr.iftrue)
         iffalse = self._expr(expr.iffalse)
-        return ailment.Expr.ITE(expr.idx, cond, iffalse, iftrue)
+        return DataSet(ailment.Expr.ITE(expr.idx, cond, iffalse, iftrue), expr.bits)
 
     def _ail_handle_BinaryOp(self, expr):
         r = super()._ail_handle_BinaryOp(expr)
@@ -433,7 +439,7 @@ class SimEngineRDAIL(
     #
 
     def _handle_function(self):
-        if self._current_local_call_depth > self._maximum_local_call_depth:
+        if len(self._call_stack) + 1 > self._maximum_local_call_depth:
             l.warning('The analysis reached its maximum recursion depth.')
             return None
 
@@ -473,11 +479,19 @@ class SimEngineRDAIL(
         elif is_internal is True:
             handler_name = 'handle_local_function'
             if hasattr(self._function_handler, handler_name):
-                is_updated, state = getattr(self._function_handler, handler_name)(self.state, ip_addr,
-                                                                                  self._current_local_call_depth + 1,
-                                                                                  self._maximum_local_call_depth)
+                is_updated, state, visited_blocks, dep_graph = getattr(self._function_handler, handler_name)(
+                    self.state,
+                    ip_addr,
+                    self._call_stack,
+                    self._maximum_local_call_depth,
+                    self._visited_blocks,
+                    self._dep_graph,
+                )
+
                 if is_updated is True:
                     self.state = state
+                    self._visited_blocks = visited_blocks
+                    self._dep_graph = dep_graph
             else:
                 l.warning('Please implement the local function handler with your own logic.')
         else:

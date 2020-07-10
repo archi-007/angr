@@ -10,17 +10,16 @@ from ..forward_analysis import FunctionGraphVisitor, SingleNodeGraphVisitor
 class SubjectType(Enum):
     Function = 1
     Block = 2
+    CallTrace = 3
 
 
 class Subject:
-    def __init__(self, content, cfg, func_graph=None, cc=None):
+    def __init__(self, content, func_graph=None, cc=None):
         """
         The thing being analysed, and the way (visitor) to analyse it.
 
-        :param ailment.Block|angr.Block|Function content:
+        :param Union[ailment.Block, angr.Block, Function] content:
             Thing to be analysed.
-        :param angr.knowledge_plugins.cfg.cfg_model.CFGModel cfg:
-            CFG of the program the thing was found in. Only used when analysing a slice.
         :param networkx.DiGraph func_graph: Alternative graph for function.graph.
         :param SimCC cc: Calling convention of the function.
         """
@@ -40,7 +39,7 @@ class Subject:
 
     @property
     def cc(self):
-        if self.type is not SubjectType.Function:
+        if self.type not in (SubjectType.Function, SubjectType.CallTrace):
             raise TypeError('There are no `cc` attribute for <%s>.' % self.type)
         return self._cc
 

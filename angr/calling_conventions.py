@@ -512,7 +512,7 @@ class SimCC:
                 sizes = [ ]
                 for a in args:
                     if isinstance(a, SimType):
-                        if a.size is NotImplemented:
+                        if isinstance(a, SimTypeFixedSizeArray) or a.size is NotImplemented:
                             sizes.append(self.arch.bytes)
                         else:
                             sizes.append(a.size // 8)  # SimType.size is in bits
@@ -1061,6 +1061,7 @@ class SimCCMicrosoftAMD64(SimCC):
     FP_RETURN_VAL = SimRegArg('xmm0', 32)
     RETURN_ADDR = SimStackArg(0, 8)
     ARCH = archinfo.ArchAMD64
+    STACK_ALIGNMENT = 16
 
 class SimCCX86LinuxSyscall(SimCC):
     ARG_REGS = ['ebx', 'ecx', 'edx', 'esi', 'edi', 'ebp']

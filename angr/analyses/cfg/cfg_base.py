@@ -2282,7 +2282,7 @@ class CFGBase(Analysis):
 
         addr = jump.addr if jump is not None else jump_addr
         l.debug('The indirect jump at %#x is successfully resolved by %s. It has %d targets.', addr, resolved_by, len(targets))
-        self.kb.resolved_indirect_jumps.add(addr)
+        self.kb.indirect_jumps.update_resolved_addrs(addr, targets)
 
     def _indirect_jump_unresolved(self, jump):
         """
@@ -2364,7 +2364,7 @@ class CFGBase(Analysis):
         all_targets = set()
         for idx, jump in enumerate(self._indirect_jumps_to_resolve):  # type:int,IndirectJump
             if self._low_priority:
-                self._release_gil(idx, 20, 0.0001)
+                self._release_gil(idx, 20, 0.000001)
             all_targets |= self._process_one_indirect_jump(jump)
 
         self._indirect_jumps_to_resolve.clear()

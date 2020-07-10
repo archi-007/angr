@@ -1,5 +1,5 @@
-
 # pylint:disable=no-self-use
+from typing import Tuple
 
 import logging
 
@@ -23,6 +23,7 @@ class SimEngineLight(SimEngine):
         self.state = None
         self.arch = None
         self.block = None
+        self._call_stack = None
 
         self.stmt_idx = None
         self.ins_addr = None
@@ -46,10 +47,20 @@ class SimEngineLight(SimEngine):
     # Helper methods
     #
 
+    @property
+    def _context(self) -> Tuple[int]:
+        if not self._call_stack:
+            return tuple()
+
+        # Convert to Tuple to make `context` hashable if not None
+        call_stack_addresses = tuple(self._call_stack)
+        return call_stack_addresses
+
     def _codeloc(self, block_only=False):
         return CodeLocation(self.block.addr,
                             None if block_only else self.stmt_idx,
                             ins_addr=None if block_only else self.ins_addr,
+                            context=self._context
                             )
 
 
@@ -92,6 +103,13 @@ class SimEngineLightVEXMixin:
 
             self._handle_Stmt(stmt)
 
+        self._process_block_end()
+
+    def _process_block_end(self):
+        # handle calls to another function
+        # Note that without global information, we cannot handle cases where we *jump* to another function (jumpkind ==
+        # "Ijk_Boring"). Users are supposed to overwrite this method, detect these cases with the help of global
+        # information (such as CFG or symbol addresses), and handle them accordingly.
         if self.block.vex.jumpkind == 'Ijk_Call':
             self.stmt_idx = DEFAULT_STATEMENT
             handler = '_handle_function'
@@ -576,7 +594,7 @@ class SimEngineLightAILMixin:
     #
 
     def _codeloc(self):
-        return CodeLocation(self.block.addr, self.stmt_idx, ins_addr=self.ins_addr)
+        return CodeLocation(self.block.addr, self.stmt_idx, ins_addr=self.ins_addr, context=self._context)
 
     #
     # Statement handlers
